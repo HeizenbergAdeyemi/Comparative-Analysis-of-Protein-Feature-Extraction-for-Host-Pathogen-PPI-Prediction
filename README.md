@@ -1,0 +1,2 @@
+# Comparative-Analysis-of-Protein-Feature-Extraction-for-Host-Pathogen-PPI-Prediction
+This project evaluates traditional and protein language model (PLM)-based feature extraction methods for predicting host-pathogen protein-protein interactions (PPIs). Using datasets from five organism groups, it trains six ML models, generates predictions, and produces visualizations and performance metrics for in-depth comparative analysis.
