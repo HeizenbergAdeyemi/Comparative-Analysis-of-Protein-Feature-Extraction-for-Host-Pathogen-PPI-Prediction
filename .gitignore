@@ -1,0 +1,23 @@
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.venv/
+venv/
+.env
+.DS_Store
+
+# Large / regenerable artefacts
+data/raw/
+data/processed/
+features/
+embeddings/
+*.npy
+*.npz
+*.pkl
+*.joblib
+*.h5
+*.keras
+models/
+blastdb/
+*.pssm
+*.asn1
