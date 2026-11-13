@@ -17,7 +17,7 @@ A benchmarking study of **traditional sequence-derived features** versus **prote
 | **Deep models** | DNN · RNN · CNN |
 | **Metrics** | Confusion matrix · ROC-AUC · accuracy · precision · recall · F1 |
 
-> **Scope of the results shown below.** The figure set currently in `results/` covers **RF, SVM and XGBoost** on **AAC, DPC, K-mer, PSSM, ESM2 and ProtBert** for all five organism groups (5 × 6 × 3 = 90 combinations, 180 plots). CTriad, ProtT5 and the DNN/RNN/CNN models are part of the pipeline and are documented in [`docs/`](docs/), but their results are not yet included here.
+> **Scope of the results shown below.** The figure set currently in `results/` covers **RF, SVM and XGBoost** on **AAC, DPC, K-mer, PSSM, ESM2 and ProtBert** for all five organism groups (5 × 6 × 3 = 90 combinations, 180 plots). CTriad, ProtT5 and the DNN/RNN/CNN models are implemented in the pipeline and documented in [`docs/`](docs/), but their results are not included here. The figures were produced by an earlier version of the plotting code than the one in `src/`; see [`docs/05_evaluation_and_visualisation.md`](docs/05_evaluation_and_visualisation.md).
 
 ## Key findings
 
@@ -33,7 +33,7 @@ Test-set sizes and class balance differ a lot between organisms, so accuracy alo
 
 1. **Simple composition features were at least as good as PLM embeddings in every organism group.** Taken together, AAC/DPC/K-mer beat ESM2 and ProtBert on mean AUC and F1 in all five groups, despite being far cheaper to compute (individual exceptions exist, e.g. AAC alone trails ProtBert on Bacillus). This is a result about *this* benchmark and its splits, not a general claim about PLMs.
 2. **The PSSM pipeline collapsed.** All 15 PSSM models (3 models × 5 organisms) output a single constant class, giving ROC-AUC = 0.50 and an accuracy equal to the majority-class baseline. Identical matrices from three very different learners point to a degenerate feature matrix upstream, not to a property of PSSM features. See [`docs/06_troubleshooting.md`](docs/06_troubleshooting.md) and [`results/summary/pssm_collapse_confusion_matrices.png`](results/summary/pssm_collapse_confusion_matrices.png). The non-zero PSSM F1 for HIV-1 and Plasmodium in the heatmap is an artefact of predicting *everything* positive.
-3. **Possible data leakage in the HIV-1 and SARS-CoV-2 datasets.** Composition features reach AUC ≈ 1.00 (accuracy up to 99.96 % on HIV-1), while PLM embeddings, which should carry richer information, score lower (0.93–0.98). A perfect score that a stronger representation fails to reproduce is a classic signature of a dataset shortcut (e.g. negatives sampled differently from positives, or near-identical sequences on both sides of the split). This is flagged as a diagnostic finding that needs sequence-identity-aware splitting to confirm; see [`docs/07_reproducibility.md`](docs/07_reproducibility.md).
+3. **Possible data leakage in the HIV-1 and SARS-CoV-2 datasets.** Composition features reach AUC ≈ 1.00 (accuracy up to 99.96 % on HIV-1), while PLM embeddings, which should carry richer information, score lower (0.93–0.98). A perfect score that a stronger representation fails to reproduce is a classic signature of a dataset shortcut (e.g. negatives sampled differently from positives, or near-identical sequences on both sides of the split). The most likely mechanism is visible in `train_model.py`: the split is a stratified random 80/20 split of *pairs*, so a protein that occurs in several pairs lands on both sides of the split, and composition vectors act as protein fingerprints. This needs a protein- or cluster-grouped split to confirm; see [`docs/07_reproducibility.md`](docs/07_reproducibility.md).
 4. **Plasmodium is the hardest group** (balanced test set; best AUC 0.90 and best F1 0.82, both from XGBoost on AAC), so differences between representations are most visible there.
 
 ## Repository layout
@@ -72,10 +72,17 @@ Per-organism galleries with every plot and metric: [`bacillus`](results/figures/
 git clone https://github.com/HeizenbergAdeyemi/Comparative-Analysis-of-Protein-Feature-Extraction-for-Host-Pathogen-PPI-Prediction.git
 cd Comparative-Analysis-of-Protein-Feature-Extraction-for-Host-Pathogen-PPI-Prediction
 pip install -r requirements.txt
-python src/main_pipeline.py      # confirm arguments against main_pipeline.py
+
+# quick test: one organism, two cheap features, two models
+python src/main_pipeline.py --data-root data --output-root outputs \
+    --organisms plant --features AAC DPC --models RF XGB
+
+# full run (all organisms, all features, all models)
+python src/main_pipeline.py --data-root data --output-root outputs \
+    --pssm-database /path/to/blastdb/swissprot
 ```
 
-Full environment notes (BLAST+/SwissProt for PSSM, GPU/CUDA for PLMs and TensorFlow) are in [`docs/07_reproducibility.md`](docs/07_reproducibility.md).
+Input layout (`data/<organism>/interacting_host.fasta`, `interacting_pathogen.fasta`, `non_interacting_host.fasta`, `non_interacting_pathogen.fasta`) is described in [`docs/01_project_overview.md`](docs/01_project_overview.md). `--pssm-database` takes the BLAST database *prefix*, not the downloaded archive name. GPU use is off by default; set `PPI_USE_GPU=1` to enable it. Details in [`docs/07_reproducibility.md`](docs/07_reproducibility.md).
 
 ## License
 

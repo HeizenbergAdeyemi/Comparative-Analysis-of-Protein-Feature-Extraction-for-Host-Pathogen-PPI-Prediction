@@ -2,57 +2,76 @@
 
 ## Training and testing procedure
 
-For each organism group and each feature set, every model is trained on the training portion and evaluated on a held-out test portion. The test-set totals visible in the saved confusion matrices are:
+Implemented in `train_model.train_and_evaluate`:
+
+1. Validate the feature matrix (2-D, finite, aligned with labels, both classes present).
+2. Split the pairs 80 / 20 with `train_test_split(test_size=0.2, random_state=42, stratify=y)`.
+3. For each requested model, fit on the training set only (imputer and scaler included), predict on the test set, obtain scores (`predict_proba`, or the network's sigmoid output) and call `save_evaluation`.
+4. Record `n_train` and `n_test` with the metrics and write `summary_metrics.json`.
+
+The test-set totals visible in the shipped confusion matrices:
 
 | Organism | Negative | Positive | Total | Majority-class accuracy |
 |---|---|---|---|---|
 | `bacillus` | 1893 | 508 | 2401 | 0.788 |
+| `plant` | 513 | 104 | 617 | 0.831 |
 | `human_hiv1` | 355 | 2483 | 2838 | 0.875 |
 | `human_sars_cov2` | 126 | 64 | 190 | 0.663 |
-| `plant` | 513 | 104 | 617 | 0.831 |
 | `plasmodium` | 146 | 147 | 293 | 0.502 |
-
-> **TODO (author):** state the split ratio, whether it is stratified, the random seed, and whether sequences or pairs were split (this matters for leakage; see Part 7).
 
 ## Confusion matrices
 
-Layout used in every saved figure: **rows = actual class, columns = predicted class, class 0 = non-interacting, class 1 = interacting**, so the cells are `[[TN, FP], [FN, TP]]`. Drawn as an annotated seaborn heatmap with the `Blues` colormap and titled `"{MODEL} - {organism} ({feature})"`.
+Computed with `confusion_matrix(y_true, y_pred, labels=[0, 1])`: **rows = actual class, columns = predicted class, class 0 = non-interacting, class 1 = interacting**, so the cells are `[[TN, FP], [FN, TP]]`.
 
 ## ROC curves and AUC
 
-The ROC curve plots true-positive rate against false-positive rate across decision thresholds, with the dashed diagonal as the chance line. AUC summarises it as the probability that a random positive is scored above a random negative. It needs continuous scores (probabilities or decision values) and is insensitive to the chosen threshold. Figures are titled `"ROC - {MODEL} - {organism} ({feature})"` with the AUC (2 decimals) in the legend. An AUC of exactly 0.50 means no ranking information.
+The ROC curve plots true-positive rate against false-positive rate across thresholds, with the dashed diagonal as the chance line. AUC is the probability that a random positive is scored above a random negative. It needs continuous scores and does not depend on the 0.5 threshold. An AUC of exactly 0.50 means no ranking information. If the test set contains one class only, AUC is reported as `NaN` and the ROC plot is skipped.
 
 ## Accuracy, precision, recall and F1
 
-With `TP, TN, FP, FN` from the confusion matrix:
+From `TP, TN, FP, FN` (all computed with scikit-learn, `zero_division=0`):
 
-| Metric | Formula | Guard needed |
+| Metric | Formula |
+|---|---|
+| Accuracy | (TP + TN) / (TP + TN + FP + FN) |
+| Precision | TP / (TP + FP), 0 if the model never predicts positive |
+| Recall | TP / (TP + FN) |
+| F1 | 2 · P · R / (P + R), 0 if P + R = 0 |
+
+## Results organisation and saving
+
+What the pipeline writes (`--output-root`, default `outputs/`):
+
+```
+outputs/
+├── pipeline_summary.json                  # all organisms
+├── <organism>_pipeline_summary.json       # per organism (errors recorded per feature)
+├── cache/                                 # PLM embeddings, PSSM vectors
+└── <organism>/<feature>/                  # feature = AAC, DPC, KMER, CTRIAD, PSSM, ESM2, ProtBert, ProtT5
+    ├── summary_metrics.json
+    ├── <MODEL>_model.joblib | .keras      # saved models (+ _scaler.joblib for neural)
+    ├── <feature>_<MODEL>_confusion_matrix.png
+    ├── <feature>_<MODEL>_roc_curve.png
+    └── <feature>_<MODEL>_metrics.json
+```
+
+The published `results/` folder in this repository is organised differently, for browsing: `results/figures/<organism>/<feature>/<model>_{confusion_matrix,roc_curve}.png`, plus `results/metrics/results_summary.csv` and `results/summary/`.
+
+### The shipped figures were drawn by an earlier plotting routine
+
+The figures in `results/figures/` do not match what the current `evaluate_model.py` produces:
+
+| | Shipped figures | Current `evaluate_model.py` |
 |---|---|---|
-| Accuracy | (TP + TN) / (TP + TN + FP + FN) | none |
-| Precision | TP / (TP + FP) | zero when the model never predicts positive |
-| Recall | TP / (TP + FN) | zero if there are no positives |
-| F1 | 2 · P · R / (P + R) | zero when P + R = 0 |
+| Confusion-matrix style | seaborn-style heatmap with colour bar, axes "Actual"/"Predicted", tick labels 0/1 | `ConfusionMatrixDisplay`, no colour bar, labels "Non-interacting"/"Interacting" |
+| Title | `RF - bacillus (esm2)` | `Confusion matrix: <feature>_<MODEL>` |
+| ROC legend | `AUC = 0.93` | `AUC = 0.930` (3 decimals) |
+| Feature names | `aac`, `dipeptide`, `kmer`, `pssm` | `AAC`, `DPC`, `KMER`, `PSSM` |
 
-Use `zero_division=0` in scikit-learn so a collapsed model reports 0 rather than raising (Part 6).
+The study results therefore come from an earlier version of the pipeline, and the figures cannot be regenerated byte-for-byte from the current code. Re-running the current code (ideally after the fixes in Part 7) would give figures, metrics JSON and code that agree.
 
 ## Reading the results correctly
 
 - **Always compare accuracy with the majority-class baseline.** Predicting everything negative scores 0.788 on Bacillus; everything positive scores 0.875 on HIV-1.
-- **Collapsed models can look good on some metrics.** The PSSM models for HIV-1 and Plasmodium predict all-positive, which gives F1 ≈ 0.93 and 0.67 on those sets while AUC is 0.50. AUC and the confusion matrix expose this; F1 alone does not.
+- **Collapsed models can look good on some metrics.** The PSSM models for HIV-1 and Plasmodium predict all-positive, giving F1 ≈ 0.93 and 0.67 while AUC is 0.50. AUC and the confusion matrix expose this; F1 alone does not.
 - **AUC ≈ 1.00 is a warning, not a result.** It occurs for AAC/DPC/K-mer on HIV-1 and SARS-CoV-2 (Part 7).
-
-## Results organisation and saving
-
-```
-results/
-├── metrics/results_summary.csv
-├── summary/                               # aggregate figures
-└── figures/<organism>/<feature>/
-    ├── rf_confusion_matrix.png   ├── rf_roc_curve.png
-    ├── svm_confusion_matrix.png  ├── svm_roc_curve.png
-    └── xgb_confusion_matrix.png  └── xgb_roc_curve.png
-```
-
-Organism identifiers: `bacillus`, `human_hiv1`, `human_sars_cov2`, `plant`, `plasmodium`. Feature identifiers: `aac`, `dipeptide`, `kmer`, `pssm`, `esm2`, `protbert`. Each organism folder has a `README.md` gallery with all plots and metrics.
-
-> **TODO (author):** if `evaluate_model.py` writes its own metrics file, point to it here and note that `results_summary.csv` in this repository was reconstructed from the saved plots (see `results/README.md`).

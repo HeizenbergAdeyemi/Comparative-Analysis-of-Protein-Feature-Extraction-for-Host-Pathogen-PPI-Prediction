@@ -1,16 +1,13 @@
-# Indicative dependency list inferred from the project scope.
-# Pin exact versions from the environment that produced the results:
-#   pip freeze > requirements.lock.txt
+# Dependencies inferred from the imports in src/. Pin exact versions from the
+# environment that produced your results:  pip freeze > requirements.lock.txt
 numpy
 pandas
 scikit-learn
-xgboost
+joblib
 matplotlib
-seaborn
-tqdm
-biopython            # FASTA parsing, BLAST wrappers
-torch                # PLM inference
-transformers         # ProtBert, ProtT5 (and ESM2 via Hugging Face, if used)
-sentencepiece        # ProtT5 tokenizer
-# fair-esm           # only if ESM2 is loaded through the original esm package
-tensorflow           # DNN / RNN / CNN
+xgboost          # optional: XGB is skipped if missing
+tensorflow       # optional: DNN/RNN/CNN are skipped if missing
+torch            # required at start-up (imported by extract_features_plm.py)
+transformers     # ESM2, ProtBert, ProtT5
+sentencepiece    # ProtT5 tokenizer
+biopython        # optional: FASTA parsing falls back to a built-in reader

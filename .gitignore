@@ -6,18 +6,18 @@ venv/
 .env
 .DS_Store
 
-# Large / regenerable artefacts
-data/raw/
-data/processed/
-features/
-embeddings/
+# Pipeline outputs (default --output-root) and heavy artefacts
+outputs/
 *.npy
 *.npz
 *.pkl
 *.joblib
 *.h5
 *.keras
-models/
 blastdb/
 *.pssm
 *.asn1
+
+# Input FASTA: ignored by default. Remove this line if the datasets are small
+# enough to share (GitHub rejects files over 100 MB).
+data/*/
